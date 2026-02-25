@@ -1,46 +1,73 @@
 import { useState, useCallback } from "react";
-import { Brain, Sparkles } from "lucide-react";
+import { Brain } from "lucide-react";
 import FileUpload from "@/components/FileUpload";
 import MetricsCards from "@/components/MetricsCards";
-import ClusterChart from "@/components/ClusterChart";
+import ClusterScatterChart from "@/components/ClusterChart";
 import ClusterBarChart from "@/components/ClusterBarChart";
 import PredictionTable from "@/components/PredictionTable";
-import {
-  parseCSV,
-  generateSampleData,
-  runSegmentation,
-  getClusterSummaries,
-  getMetrics,
-  type CustomerData,
-} from "@/lib/mockML";
+import { type CustomerData } from "@/lib/mockML";
+
+interface MLResponse {
+  metrics: any;
+  clusters: { id: number; name: string; count: number }[];
+  topCustomers: any[];
+  trends: any;
+  scatterPlotAxes: {
+    x: { label: string; values: number[] };
+    y: { label: string; values: number[] };
+    color: string[];
+    size: number[];
+  };
+  data: CustomerData[];
+  error?: string;
+  columns: string[];
+}
 
 const Index = () => {
   const [data, setData] = useState<CustomerData[] | null>(null);
+  const [metrics, setMetrics] = useState<any>(null);
+  const [clusters, setClusters] = useState<any[]>([]);
+  const [scatterPlotAxes, setScatterPlotAxes] = useState<any | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [topCustomers, setTopCustomers] = useState([]);
+  const [columns, setColumns] = useState([]);
+  const [error, setError] = useState("");
 
-  const processData = useCallback((raw: CustomerData[]) => {
-    setProcessing(true);
-    setTimeout(() => {
-      const segmented = runSegmentation(raw);
-      setData(segmented);
+  const handleFile = useCallback(async (file: File) => {
+    try {
+      setProcessing(true);
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("http://localhost:8000/analytics", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to analyze file");
+      }
+
+      const result: MLResponse = await response.json();
+
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+
+      setData(result.data);
+      setMetrics(result.metrics);
+      setClusters(result.clusters);
+      setScatterPlotAxes(result.scatterPlotAxes);
+      setTopCustomers(result.topCustomers);
+      setColumns(result.columns);
+    } catch (error) {
+      console.error(error);
+    } finally {
       setProcessing(false);
-    }, 1200);
+    }
   }, []);
-
-  const handleFile = useCallback(
-    (content: string) => {
-      const parsed = parseCSV(content);
-      processData(parsed.length > 0 ? parsed : generateSampleData());
-    },
-    [processData]
-  );
-
-  const handleDemo = useCallback(() => {
-    processData(generateSampleData(250));
-  }, [processData]);
-
-  const clusters = data ? getClusterSummaries(data) : [];
-  const metrics = getMetrics();
 
   return (
     <div className="min-h-screen bg-background">
@@ -52,19 +79,14 @@ const Index = () => {
               <Brain className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-foreground tracking-tight">SegmentAI</h1>
-              <p className="text-xs text-muted-foreground">Customer Intelligence Platform</p>
+              <h1 className="text-lg font-bold text-foreground tracking-tight">
+                SegmentAI
+              </h1>
+              <p className="text-xs text-muted-foreground">
+                Customer Intelligence Platform
+              </p>
             </div>
           </div>
-          {!data && (
-            <button
-              onClick={handleDemo}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-colors"
-            >
-              <Sparkles className="w-4 h-4" />
-              Load Demo Data
-            </button>
-          )}
         </div>
       </header>
 
@@ -73,8 +95,9 @@ const Index = () => {
         {processing && (
           <div className="glass-card p-12 flex flex-col items-center justify-center gap-4">
             <div className="w-12 h-12 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-            <p className="text-foreground font-medium">Running ML Pipeline...</p>
-            <p className="text-muted-foreground text-sm">K-Means clustering & Random Forest classification</p>
+            <p className="text-foreground font-medium">
+              Running ML Pipeline...
+            </p>
           </div>
         )}
 
@@ -83,32 +106,77 @@ const Index = () => {
           <div className="grid md:grid-cols-2 gap-6 pt-12">
             <div className="flex flex-col justify-center gap-6">
               <h2 className="text-4xl font-extrabold tracking-tight">
-                <span className="text-gradient">AI-Powered</span>
+                <span className="text-gradient">Smart</span>
                 <br />
-                Customer Segmentation
+                Customer Insights
               </h2>
               <p className="text-muted-foreground text-lg leading-relaxed max-w-md">
-                Upload your customer data and let machine learning uncover hidden segments and predict high-value customers instantly.
+                Upload your customer data to instantly discover customer groups,
+                identify your most valuable customers, and get actionable
+                insights.
               </p>
               <div className="flex gap-3 text-sm text-muted-foreground">
-                <span className="px-3 py-1 rounded-full bg-secondary font-mono">K-Means</span>
-                <span className="px-3 py-1 rounded-full bg-secondary font-mono">Random Forest</span>
-                <span className="px-3 py-1 rounded-full bg-secondary font-mono">Analytics</span>
+                <span className="px-3 py-1 rounded-full bg-secondary font-mono">
+                  Grouping
+                </span>
+                <span className="px-3 py-1 rounded-full bg-secondary font-mono">
+                  Value Scoring
+                </span>
+                <span className="px-3 py-1 rounded-full bg-secondary font-mono">
+                  Analytics
+                </span>
               </div>
             </div>
-            <FileUpload onFileLoaded={handleFile} hasData={false} />
+            <div className="space-y-4">
+              {/* Data Requirements Card */}
+              <div className="bg-secondary/40 border border-border rounded-xl p-5 text-md space-y-3">
+                <p className="font-semibold text-foreground">
+                  📌 Smart Data Requirements
+                </p>
+                <ul className="list-disc pl-5 space-y-2 text-muted-foreground">
+                  <li>
+                    At least one numeric column (income, expenditure, invoice
+                    amount)
+                  </li>
+                  <li>Two or more numeric columns for better clustering</li>
+                  <li>
+                    A date column (invoice_date, purchase_date) for trend
+                    analysis
+                  </li>
+                  <li>
+                    A customer identifier column for top customer insights
+                  </li>
+                </ul>
+                <p className="text-xs text-muted-foreground pt-2">
+                  Supported format: CSV with headers.
+                </p>
+              </div>
+
+              <FileUpload
+                onFileLoaded={(file) => handleFile(file)}
+                hasData={false}
+              />
+              {error && <div className="text-warning">{error}</div>}
+            </div>
           </div>
         )}
 
         {/* Dashboard */}
-        {data && !processing && (
+        {data && !processing && scatterPlotAxes && (
           <>
             <MetricsCards metrics={metrics} data={data} clusters={clusters} />
+
             <div className="grid lg:grid-cols-2 gap-6">
-              <ClusterChart data={data} />
+              <ClusterScatterChart
+                data={data}
+                clusters={clusters}
+                scatterPlotAxes={scatterPlotAxes}
+              />
               <ClusterBarChart clusters={clusters} />
             </div>
-            <PredictionTable data={data} />
+
+            <PredictionTable data={topCustomers} columns={columns} />
+
             <div className="flex justify-center pt-2">
               <FileUpload onFileLoaded={handleFile} hasData={true} />
             </div>
