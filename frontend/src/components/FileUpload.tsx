@@ -58,7 +58,7 @@ const FileUpload = ({ onFileLoaded, hasData }: FileUploadProps) => {
 
         <div className="text-center">
           <p className="text-foreground font-semibold text-lg">
-            {hasData ? "Dataset Loaded" : "Upload Customer CSV"}
+            {hasData ? "Upload New File" : "Upload Customer CSV"}
           </p>
           <p className="text-muted-foreground text-sm mt-1">
             {hasData
