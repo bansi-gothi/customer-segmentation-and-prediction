@@ -1,91 +1,72 @@
 import pandas as pd
 import numpy as np
+from sklearn.preprocessing import StandardScaler
 from app.services.ml_service import build_model
+
+
+REQUIRED_COLUMNS = ['CustomerID', 'Date', 'Revenue', 'Transactions']
 
 
 def preprocess_data(df):
 
     df.columns = df.columns.astype(str)
 
-    df = df.loc[:, ~df.columns.str.contains("^Unnamed", case=False)]
-    df = df.loc[:, df.columns.notna()]
-    df = df.rename(columns=lambda x: x.strip() if isinstance(x, str) else x)
-    df = df.loc[:, df.columns != ""]
-    try:
-        # -----------------------------
-        # Convert Date Columns (Optional)
-        # -----------------------------
-       date_cols = []
+    # Lowercase comparison
+    df_columns_lower = [col.lower() for col in df.columns]
 
-       for col in df.columns:
-        if isinstance(col, str) and "date" in col.lower():
+    # Check required columns
+    missing_cols = [
+        col for col in REQUIRED_COLUMNS
+        if col.lower() not in df_columns_lower
+    ]
 
-            df[col] = pd.to_datetime(df[col], errors="coerce")
-            date_cols.append(col)
-
-        # -----------------------------
-        # Identify Column Types
-        # -----------------------------
-        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        categorical_cols = df.select_dtypes(include=["object"]).columns.tolist()
-
-        if not numeric_cols:
-            return {"error": "At least one numeric column is required."}
-
-        # -----------------------------
-        # Detect Revenue Column
-        # -----------------------------
-        revenue_keywords = ["income", "revenue", "amount", "invoice", "sales", "expenditure"]
-
-        primary_metric = None
-        for col in numeric_cols:
-            for keyword in revenue_keywords:
-                if keyword in col.lower():
-                    primary_metric = col
-                    break
-            if primary_metric:
-                break
-
-        if not primary_metric:
-            primary_metric = numeric_cols[0]
-
-        # -----------------------------
-        # Detect Customer Column (Still Mandatory)
-        # -----------------------------
-        customer_col = None
-        customer_keywords = ["customer", "client", "user", "name", "id"]
-
-        for col in df.columns:
-            for keyword in customer_keywords:
-                if keyword in col.lower():
-                    customer_col = col
-                    break
-            if customer_col:
-                break
-
-        if not customer_col:
-            return {
-                "error": "A customer identifier column is required."
-            }
-
-        # -----------------------------
-        # Prepare Feature Data (Numeric Only)
-        # -----------------------------
-        X = df[numeric_cols].copy()
-
-        # -----------------------------
-        # Send to ML
-        # -----------------------------
-        result = build_model(
-            X=X,
-            full_df=df,
-            numeric_cols=numeric_cols,
-            date_col=date_cols[0] if date_cols else None,
-            customer_col=customer_col,
-            primary_metric=primary_metric
+    if missing_cols:
+        raise ValueError(
+            f"The following required columns are missing from CSV: {missing_cols}"
         )
 
-        return result
+    # Convert Date column
+    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
 
-    except Exception as e:
-        return {"error": str(e)}
+    if df['Date'].isna().all():
+        raise ValueError("Date column contains invalid or empty values.")
+
+    # Remove duplicates
+    df = df.drop_duplicates()
+
+    # -----------------------------
+    # Aggregate by CustomerID
+    # -----------------------------
+    customer_df = df.groupby('CustomerID').agg({
+        'Revenue': 'sum',
+        'Transactions': 'sum',
+        'Date': 'max'
+    }).reset_index()
+
+    # Calculate AvgTransactionValue
+    customer_df['AvgTransactionValue'] = (
+        customer_df['Revenue'] /
+        customer_df['Transactions'].replace(0, 1)
+    )
+
+    # Calculate Recency
+    today = pd.Timestamp('today')
+    customer_df['Recency'] = (today - customer_df['Date']).dt.days
+
+    # -----------------------------
+    # Feature Selection
+    # -----------------------------
+    X = customer_df[
+        ['Revenue', 'Transactions', 'AvgTransactionValue', 'Recency']
+    ]
+
+    # Clean numeric issues
+    X = X.replace([np.inf, -np.inf], np.nan)
+    X = X.fillna(X.mean())
+
+    # Scaling
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+    X_scaled_df = pd.DataFrame(X_scaled, columns=X.columns)
+
+    return build_model(X_scaled_df, customer_df)

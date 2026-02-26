@@ -1,51 +1,67 @@
-import {
-  TrendingUp,
-  Users,
-  DollarSign,
-  Target,
-  Brain,
-  BarChart3,
-} from "lucide-react";
-import type { ModelMetrics, CustomerData, ClusterSummary } from "@/lib/mockML";
+import { Users, TrendingUp, DollarSign, BarChart3, Repeat } from "lucide-react";
 
-interface MetricsCardsProps {
-  metrics: ModelMetrics;
-  data: CustomerData[];
-  clusters: ClusterSummary[];
+interface Metrics {
+  avg_revenue_per_customer: number;
+  avg_transactions_per_customer: number;
+  total_customers: number;
+  total_revenue: number;
+  total_transactions: number;
 }
 
-const MetricsCards = ({ metrics, data, clusters }: MetricsCardsProps) => {
-  const highValueCount = data.filter((d) => d.highValue).length;
-  const highValuePct = Math.round((highValueCount / data.length) * 100);
+interface PredictionSummaryProps {
+  metrics: Metrics;
+}
+
+const formatNumber = (num: number) => num?.toLocaleString() ?? "0";
+
+const formatCurrency = (num: number) =>
+  `₹ ${
+    num?.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }) ?? "0.00"
+  }`;
+
+const MetricsCards = ({ metrics }: PredictionSummaryProps) => {
+  if (!metrics) return null;
 
   const cards = [
     {
       label: "Total Customers",
-      value: data.length.toLocaleString(),
+      value: formatNumber(metrics.total_customers),
       icon: Users,
       color: "text-primary",
     },
     {
-      label: "High-Value",
-      value: `${highValuePct}%`,
-      icon: TrendingUp,
+      label: "Total Revenue",
+      value: formatCurrency(metrics.total_revenue),
+      icon: DollarSign,
       color: "text-success",
     },
     {
-      label: "Clusters Found",
-      value: clusters.filter((c) => c.count > 0).length,
-      icon: BarChart3,
+      label: "Avg Revenue / Customer",
+      value: formatCurrency(metrics.avg_revenue_per_customer),
+      icon: TrendingUp,
       color: "text-accent",
+    },
+    {
+      label: "Total Transactions",
+      value: formatNumber(metrics.total_transactions),
+      icon: BarChart3,
+      color: "text-warning",
+    },
+    {
+      label: "Avg Transactions / Customer",
+      value: metrics.avg_transactions_per_customer.toFixed(2),
+      icon: Repeat,
+      color: "text-secondary",
     },
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 gap-4 w-full">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
       {cards.map((card) => (
-        <div
-          key={card.label}
-          className="glass-card p-4 flex flex-col gap-2 w-full"
-        >
+        <div key={card.label} className="glass-card p-5 flex flex-col gap-3">
           <div className="flex items-center gap-2">
             <card.icon className={`w-5 h-5 ${card.color}`} />
             <span className="text-muted-foreground text-xs font-medium uppercase tracking-wider">

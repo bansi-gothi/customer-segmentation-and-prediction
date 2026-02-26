@@ -49,7 +49,7 @@ const ClusterScatterChart = ({
   const scatterData = data.map((_, idx) => ({
     x: scatterPlotAxes.x.values[idx],
     y: scatterPlotAxes.y.values[idx],
-    clusterName: scatterPlotAxes.color[idx],
+    clusterId: Number(scatterPlotAxes.color[idx]),
     size: scatterPlotAxes.size[idx],
   }));
 
@@ -105,13 +105,13 @@ const ClusterScatterChart = ({
 
             {clusters.map((cluster, i) => {
               const clusterData = scatterData.filter(
-                (row) => row.clusterName === cluster.name,
+                (row) => row.clusterId === cluster.id,
               );
 
               return (
                 <Scatter
                   key={cluster.id}
-                  name={cluster.name || `Cluster ${cluster.id}`}
+                  name={cluster.name || `Cluster ${cluster.id + 1}`}
                   data={clusterData}
                   fill={COLORS[i % COLORS.length]}
                   fillOpacity={0.75}

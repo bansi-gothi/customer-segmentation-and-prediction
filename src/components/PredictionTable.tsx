@@ -58,7 +58,11 @@ const PredictionTable = ({ data, columns }: PredictionTableProps) => {
                 className="border-b border-border/50 hover:bg-secondary/30 transition-colors"
               >
                 {visibleColumns.map((col) => (
-                  <td key={col} className="py-2.5 px-3">
+                  <td
+                    key={col}
+                    className="py-2.5 px-3 max-w-[180px] truncate"
+                    title={formatValue(row[col])}
+                  >
                     {formatValue(row[col])}
                   </td>
                 ))}

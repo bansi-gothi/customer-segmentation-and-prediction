@@ -6,5 +6,13 @@ router = APIRouter()
 
 @router.post("/analytics")
 async def analytics(file: UploadFile):
-    df = pd.read_csv(file.file)
-    return preprocess_data(df)
+    try:
+        df = pd.read_csv(file.file)
+        response = preprocess_data(df)
+        return response
+    except ValueError as ve:
+        # Catch missing column error and return message to frontend
+        return {"error": str(ve)}
+    except Exception as e:
+        # Catch all other errors
+        return {"error": "Failed to process file. " + str(e)}
